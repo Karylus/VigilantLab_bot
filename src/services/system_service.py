@@ -111,14 +111,18 @@ class SystemService:
         try:
             # First update package lists
             update_cmd = ["sudo", "apt", "update"]
-            update_success, update_output = await CommandExecutor.execute(update_cmd)
+            update_success, update_output = await CommandExecutor.execute(
+                update_cmd, timeout=None
+            )
 
             if not update_success:
                 return False, f"Error al actualizar repositorios: {update_output}"
 
             # Then upgrade packages
             upgrade_cmd = ["sudo", "apt", "upgrade", "-y"]
-            upgrade_success, upgrade_output = await CommandExecutor.execute(upgrade_cmd)
+            upgrade_success, upgrade_output = await CommandExecutor.execute(
+                upgrade_cmd, timeout=None
+            )
 
             if not upgrade_success:
                 return False, f"Error al actualizar paquetes: {upgrade_output}"
