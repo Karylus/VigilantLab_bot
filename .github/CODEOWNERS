@@ -1,0 +1,48 @@
+# CODEOWNERS - Revisores automáticos para el proyecto WATCHMAN
+
+# Configuración por defecto - todos los cambios
+* @Karylus
+
+# Documentación
+*.md @Karylus
+docs/ @Karylus
+CONTRIBUTING.md @Karylus
+INSTALL.md @Karylus
+README.md @Karylus
+SECURITY.md @Karylus
+
+# Configuración del proyecto
+pyproject.toml @Karylus
+setup.py @Karylus
+requirements.txt @Karylus
+requirements-dev.txt @Karylus
+.python-version @Karylus
+
+# GitHub
+.github/ @Karylus
+.github/dependabot.yml @Karylus
+.github/CODEOWNERS @Karylus
+.github/ISSUE_TEMPLATE/ @Karylus
+.github/PULL_REQUEST_TEMPLATE.md @Karylus
+
+# Código fuente
+src/ @Karylus
+src/commands/ @Karylus
+src/config/ @Karylus
+src/handlers/ @Karylus
+src/services/ @Karylus
+src/utils/ @Karylus
+
+# Tests
+tests/ @Karylus
+pytest.ini @Karylus
+
+# Configuración de herramientas
+.editorconfig @Karylus
+.gitignore @Karylus
+Makefile @Karylus
+.pre-commit-config.yaml @Karylus
+MANIFEST.in @Karylus
+
+# Punto de entrada
+main.py @Karylus

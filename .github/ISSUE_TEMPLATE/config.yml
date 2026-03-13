@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+    - name: "❓ Hacer una pregunta"
+      url: "https://github.com/Karylus/WATCHMAN/discussions"
+      about: "Usa Discussions para preguntas generales, no Issues"
+    - name: "🔒 Reportar Vulnerabilidad"
+      url: "https://github.com/Karylus/WATCHMAN/security/advisories"
+      about: "Reporta vulnerabilidades de seguridad de forma privada"
+    - name: "📖 Documentación"
+      url: "https://github.com/Karylus/WATCHMAN/blob/main/README.md"
+      about: "Consulta la documentación antes de reportar"

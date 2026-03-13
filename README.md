@@ -1,5 +1,9 @@
 # WATCHMAN - Home Lab Security Monitor Bot
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Telegram Bot](https://img.shields.io/badge/telegram-bot-blue.svg)](https://core.telegram.org/bots)
+
 Bot de Telegram avanzado para monitorizar y auditar remotamente tu Home Lab. Acceso restringido a un único usuario autorizado con 20+ comandos de seguridad, análisis de sistema y mantenimiento.
 
 **✨ Características:**
