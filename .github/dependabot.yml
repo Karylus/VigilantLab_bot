@@ -34,4 +34,3 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
->>>>>>> 05679856564c59822ebf3f2646448fab61c801fe
