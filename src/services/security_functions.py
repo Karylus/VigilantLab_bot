@@ -931,7 +931,7 @@ class SecurityService:
                         break
 
             # 5. Check for unusual SUID files
-            # Note: suid_msg not used, checking directly from find command
+            _, suid_msg = await SecurityService.find_suid_files()
             known_suid = [
                 "/usr/bin/passwd",
                 "/usr/bin/sudo",
@@ -1007,6 +1007,33 @@ class SecurityService:
                 status = "🚨 POSIBLE COMPROMISO"
                 emoji = "🚨"
 
+            def escape_markdown(text: str) -> str:
+                """Escape special Markdown characters to prevent parsing errors."""
+                # Characters that need escaping in Markdown: _ * [ ] ( ) ~ ` > # + - = | { } . !
+                special_chars = [
+                    "_",
+                    "*",
+                    "[",
+                    "]",
+                    "(",
+                    ")",
+                    "~",
+                    "`",
+                    ">",
+                    "#",
+                    "+",
+                    "-",
+                    "=",
+                    "|",
+                    "{",
+                    "}",
+                    ".",
+                    "!",
+                ]
+                for char in special_chars:
+                    text = text.replace(char, "\\" + char)
+                return text
+
             message = f"{emoji} ANÁLISIS DE AMENAZAS\n"
             message += "=" * 50 + "\n\n"
             message += f"Estado general: {status}\n\n"
@@ -1015,9 +1042,14 @@ class SecurityService:
                 message += "Hallazgos detectados:\n"
                 message += "-" * 50 + "\n\n"
                 for threat in threats:
-                    message += f"{threat['title']}\n"
-                    message += f"Riesgo: {threat['level']}\n"
-                    message += f"Detalles: {threat['details']}\n\n"
+                    # Escape potentially problematic characters in threat data
+                    title = escape_markdown(threat["title"])
+                    level = escape_markdown(threat["level"])
+                    details = escape_markdown(threat["details"])
+
+                    message += f"{title}\n"
+                    message += f"Riesgo: {level}\n"
+                    message += f"Detalles: {details}\n\n"
             else:
                 message += "No se detectaron amenazas significativas.\n\n"
 

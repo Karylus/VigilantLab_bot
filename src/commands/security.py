@@ -232,5 +232,5 @@ class ThreatsCommand(BaseCommand):
             "🔍 Analizando sistema en busca de amenazas...\n⏳ Por favor, espera...",
         )
         success, message = await SecurityService.analyze_threats()
-        await self.send_message(update, context, message)
+        await self.send_plain_message(update, context, message)
         logger.info(f"Threat analysis executed. Success: {success}")

@@ -67,6 +67,39 @@ class BaseCommand(ABC):
             parse_mode="Markdown",
         )
 
+    async def send_plain_message(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        text: str,
+        title: str = None,
+        emoji: str = None,
+    ) -> None:
+        """
+        Send a message to the user without Markdown parsing (plain text).
+
+        Args:
+            update: Telegram update object
+            context: Telegram context object
+            text: Message text
+            title: Optional title for the message
+            emoji: Optional emoji to prepend to title
+        """
+        if title:
+            header = f"{emoji} {title}".strip() if emoji else title
+            formatted_text = f"{header}\n{text}"
+        else:
+            formatted_text = text
+
+        # Truncate if necessary
+        formatted_text = OutputFormatter.truncate_output(formatted_text)
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=formatted_text,
+            parse_mode=None,
+        )
+
     async def send_formatted_output(
         self,
         update: Update,

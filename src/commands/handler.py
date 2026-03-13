@@ -172,14 +172,6 @@ class CommandHandlerManager:
                 logger.info(
                     f"AUDIT: Command {cmd_name} completed successfully by user {user_id}"
                 )
-
-                security_menu = SecurityMenu()
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=security_menu.get_text(),
-                    reply_markup=security_menu.get_keyboard(),
-                    parse_mode="Markdown",
-                )
             except asyncio.TimeoutError:
                 logger.error(
                     f"SECURITY: Command timeout for {cmd_name} from user {user_id}"
@@ -189,6 +181,7 @@ class CommandHandlerManager:
                     text="⏱️ El comando tardó demasiado. Intenta de nuevo.",
                     parse_mode="Markdown",
                 )
+                return
             except PermissionError:
                 logger.error(
                     f"SECURITY: Permission denied for command {cmd_name} from user {user_id}"
@@ -198,6 +191,7 @@ class CommandHandlerManager:
                     text="🔒 Permiso denegado. Algunos comandos requieren sudo.",
                     parse_mode="Markdown",
                 )
+                return
             except Exception as e:
                 logger.error(
                     f"ERROR: Command {cmd_name} failed for user {user_id}: {e}",
@@ -208,14 +202,16 @@ class CommandHandlerManager:
                     text="❌ Error al ejecutar comando. Verifica los logs.",
                     parse_mode="Markdown",
                 )
-            finally:
-                security_menu = SecurityMenu()
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=security_menu.get_text(),
-                    reply_markup=security_menu.get_keyboard(),
-                    parse_mode="Markdown",
-                )
+                return
+
+            # Send security menu only once after successful command execution
+            security_menu = SecurityMenu()
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=security_menu.get_text(),
+                reply_markup=security_menu.get_keyboard(),
+                parse_mode="Markdown",
+            )
 
     async def handle_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
