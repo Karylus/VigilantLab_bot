@@ -1,11 +1,13 @@
 import asyncio
+import ipaddress
 import logging
 import re
+import shlex
 import shutil
 import socket
 import ssl
 from datetime import datetime, timezone
-from typing import Tuple, cast
+from typing import Dict, Optional, Tuple, cast
 
 from src.services.command_executor import CommandExecutor
 from src.utils.formatters import OutputFormatter
@@ -87,7 +89,7 @@ class SecurityService:
 
         except Exception as e:
             logger.error(f"Error getting connections: {str(e)}")
-            return False, f"❌ Error al obtener conexiones: {str(e)}"
+            return False, "❌ Error al obtener conexiones del sistema"
 
     @staticmethod
     async def get_open_ports() -> Tuple[bool, str]:
@@ -132,7 +134,7 @@ class SecurityService:
 
         except Exception as e:
             logger.error(f"Error getting open ports: {str(e)}")
-            return False, f"❌ Error al obtener puertos: {str(e)}"
+            return False, "❌ Error al obtener puertos del sistema"
 
     @staticmethod
     async def get_network_processes() -> Tuple[bool, str]:
@@ -171,7 +173,7 @@ class SecurityService:
 
         except Exception as e:
             logger.error(f"Error getting network processes: {str(e)}")
-            return False, f"❌ Error al obtener procesos de red: {str(e)}"
+            return False, "❌ Error al obtener procesos de red"
 
     @staticmethod
     async def check_firewall() -> Tuple[bool, str]:
@@ -210,7 +212,7 @@ class SecurityService:
             return success, message
         except Exception as e:
             logger.error(f"Error checking firewall: {str(e)}")
-            return False, f"❌ Error al verificar firewall: {str(e)}"
+            return False, "❌ Error al verificar firewall"
 
     @staticmethod
     async def get_firewall_rules() -> Tuple[bool, str]:
@@ -240,7 +242,7 @@ class SecurityService:
             return True, message
         except Exception as e:
             logger.error(f"Error getting firewall rules: {str(e)}")
-            return False, f"❌ Error al obtener reglas: {str(e)}"
+            return False, "❌ Error al obtener reglas del firewall"
 
     @staticmethod
     async def get_failed_logins() -> Tuple[bool, str]:
@@ -249,30 +251,26 @@ class SecurityService:
             if shutil.which("lastb"):
                 cmd = ["sudo", "lastb", "-n", "10"]
             else:
-                cmd = [
-                    "bash",
-                    "-c",
-                    "grep 'Failed password' /var/log/auth.log 2>/dev/null | tail -10",
-                ]
+                # Use grep directly without bash piping for security
+                cmd = ["grep", "-i", "failed password", "/var/log/auth.log"]
 
-            success, output = await CommandExecutor.execute(cmd)
+            success, output = await CommandExecutor.execute(cmd, timeout=10)
 
-            if output and "No such file" not in output:
+            if success and output:
                 lines = output.strip().split("\n")
-                failed_list = []
-                for line in lines:
-                    if line.strip():
-                        failed_list.append(line.strip())
+                # Limit to last 10 entries
+                failed_list = [line.strip() for line in lines[-10:] if line.strip()]
 
-                message = "🔐 INTENTOS DE LOGIN FALLIDOS\n"
-                message += "=" * 50 + "\n\n"
-                message += OutputFormatter.format_list(failed_list, bullet="❌")
-                return True, message
-            else:
-                return True, "ℹ️ No hay intentos de login fallidos registrados"
+                if failed_list:
+                    message = "🔐 INTENTOS DE LOGIN FALLIDOS\n"
+                    message += "=" * 50 + "\n\n"
+                    message += OutputFormatter.format_list(failed_list, bullet="❌")
+                    return True, message
+
+            return True, "ℹ️ No hay intentos de login fallidos registrados"
         except Exception as e:
             logger.error(f"Error getting failed logins: {str(e)}")
-            return False, f"❌ Error al obtener intentos fallidos: {str(e)}"
+            return False, "❌ Error al obtener intentos de login"
 
     @staticmethod
     async def get_active_sessions() -> Tuple[bool, str]:
@@ -297,15 +295,51 @@ class SecurityService:
             return True, message
         except Exception as e:
             logger.error(f"Error getting active sessions: {str(e)}")
-            return False, f"❌ Error al obtener sesiones: {str(e)}"
+            return False, "❌ Error al obtener sesiones"
+
+    @staticmethod
+    def _is_valid_domain(domain: str) -> bool:
+        """
+        Validate domain name according to RFC 1123.
+
+        Args:
+            domain: Domain to validate
+
+        Returns:
+            True if valid domain, False otherwise
+        """
+        if not domain or len(domain) > 253:
+            return False
+
+        # Check for leading/trailing dots or dashes
+        if domain.startswith(".") or domain.startswith("-"):
+            return False
+        if domain.endswith(".") or domain.endswith("-"):
+            return False
+
+        # No consecutive dots or dashes
+        if ".." in domain or "--" in domain:
+            return False
+
+        # Ensure it's not an IP address (IPs should not be checked as domains)
+        try:
+            ipaddress.ip_address(domain)
+            return False
+        except ValueError:
+            pass  # Not an IP, which is good
+
+        # RFC 1123 compliant pattern
+        # Domain labels: 1-63 chars, alphanumeric and hyphens
+        # TLD: 2+ chars, alphabetic only
+        pattern = r"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z]{2,}$"
+
+        return bool(re.match(pattern, domain))
 
     @staticmethod
     async def check_ssl_certificate(domain: str) -> Tuple[bool, str]:
-        """Check SSL certificate validity for a domain."""
+        """Check SSL certificate validity for a domain with timeout."""
 
-        DOMAIN_REGEX = r"^[a-zA-Z0-9.-]+$"
-
-        if not re.match(DOMAIN_REGEX, domain):
+        if not SecurityService._is_valid_domain(domain):
             return False, "❌ Dominio inválido"
 
         def _check():
@@ -386,8 +420,19 @@ class SecurityService:
     async def find_suid_files() -> Tuple[bool, str]:
         """Find files with SUID bit set (potential privilege escalation vectors)."""
         try:
-            cmd = ["find", "/", "-perm", "-4000", "-type", "f"]
-            success, output = await CommandExecutor.execute(cmd)
+            # Limit find to common directories to avoid excessive scanning
+            cmd = [
+                "find",
+                "/usr",
+                "/bin",
+                "/sbin",
+                "/opt",
+                "-perm",
+                "-4000",
+                "-type",
+                "f",
+            ]
+            success, output = await CommandExecutor.execute(cmd, timeout=15)
 
             if success and output:
                 lines = output.strip().split("\n")
@@ -414,12 +459,18 @@ class SecurityService:
     async def get_cron_jobs() -> Tuple[bool, str]:
         """List scheduled cron jobs (potential persistence mechanism)."""
         try:
-            cmd = [
-                "bash",
-                "-c",
-                "crontab -l 2>/dev/null ; ls -la /etc/cron* 2>/dev/null",
-            ]
-            success, output = await CommandExecutor.execute(cmd)
+            # Use separate commands for better security instead of piping
+            cmd = ["bash", "-c", "crontab -l 2>/dev/null"]
+            success, output = await CommandExecutor.execute(cmd, timeout=10)
+
+            cron_output = output if success else ""
+
+            # List system cron directories
+            cmd2 = ["bash", "-c", "ls -la /etc/cron* 2>/dev/null"]
+            success2, output2 = await CommandExecutor.execute(cmd2, timeout=10)
+
+            if success2:
+                cron_output += "\n\n" + output2
 
             if success and output and "no crontab" not in output:
                 message = "⏰ TAREAS PROGRAMADAS (CRON)\n"
@@ -614,6 +665,35 @@ class SecurityService:
         return False
 
     @staticmethod
+    async def _count_failed_logins() -> int:
+        """Count failed login attempts directly from system without parsing messages."""
+        try:
+            if shutil.which("lastb"):
+                cmd = ["sudo", "lastb", "-n", "100"]
+                success, output = await CommandExecutor.execute(cmd, timeout=10)
+            else:
+                # Count lines in auth.log with "Failed password"
+                cmd = [
+                    "bash",
+                    "-c",
+                    "grep -c 'Failed password' /var/log/auth.log 2>/dev/null || echo 0",
+                ]
+                success, output = await CommandExecutor.execute(cmd, timeout=10)
+
+            if success:
+                try:
+                    # Extract number from output
+                    count_str = output.strip().split("\n")[-1]
+                    count = int(count_str)
+                    return count
+                except (ValueError, IndexError):
+                    return 0
+            return 0
+        except Exception as e:
+            logger.warning(f"Error counting failed logins: {e}")
+            return 0
+
+    @staticmethod
     def _extract_ip_port_from_connection_line(line: str) -> Tuple[str, str, str, str]:
         """Extract local_ip, local_port, remote_ip, remote_port from connection line."""
         parts = line.split()
@@ -643,12 +723,8 @@ class SecurityService:
             score = 0
 
             # 1. Check failed logins (brute force attacks)
-            _, failed_logins_msg = await SecurityService.get_failed_logins()
-            failed_login_count = 0
-
-            if "❌" in failed_logins_msg:
-                # Count the bullet points in the message
-                failed_login_count = failed_logins_msg.count("❌")
+            # Count directly from system, not from formatted message
+            failed_login_count = await SecurityService._count_failed_logins()
 
             if failed_login_count > 0:
                 risk_level = "BAJO"
@@ -776,17 +852,29 @@ class SecurityService:
 
             try:
                 if shutil.which("ps"):
-                    cmd = ["bash", "-c", "ps aux | grep -E '^\\S+\\s+\\d+' | tail -50"]
+                    # Use ps directly without bash piping when possible
+                    cmd = ["bash", "-c", "ps aux --sort=-%cpu | head -50"]
                     success, output = await CommandExecutor.execute(cmd)
 
                     if success and output:
                         for line in output.split("\n"):
                             for susp_dir in ["/tmp/", "/dev/shm/", "/var/tmp/"]:
                                 if susp_dir in line:
-                                    # Extract process name
-                                    parts = line.split()
-                                    if len(parts) >= 11:
-                                        proc_name = " ".join(parts[10:])
+                                    # Parse ps aux line safely
+                                    # ps aux format: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+                                    try:
+                                        parts = line.split(
+                                            None, 10
+                                        )  # Split into max 11 parts
+                                        if len(parts) < 11:
+                                            logger.warning(
+                                                f"Unexpected ps format: {line}"
+                                            )
+                                            continue
+
+                                        proc_name = parts[
+                                            10
+                                        ]  # Last part is always the command
 
                                         # Check if process is in whitelist
                                         is_legitimate = any(
@@ -805,6 +893,11 @@ class SecurityService:
                                             )
                                             score += 3
                                             break
+                                    except (IndexError, ValueError) as e:
+                                        logger.warning(
+                                            f"Failed to parse process line: {line}: {e}"
+                                        )
+                                        continue
             except Exception as e:
                 logger.warning(f"Error checking suspicious processes: {e}")
 
@@ -838,8 +931,7 @@ class SecurityService:
                         break
 
             # 5. Check for unusual SUID files
-            _, suid_msg = await SecurityService.find_suid_files()
-
+            # Note: suid_msg not used, checking directly from find command
             known_suid = [
                 "/usr/bin/passwd",
                 "/usr/bin/sudo",

@@ -1,5 +1,6 @@
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from typing import Optional
 
 from src.config import settings
@@ -11,7 +12,7 @@ def configure_logging(
     log_file: Optional[str] = None,
 ) -> logging.Logger:
     """
-    Configure logging for the application.
+    Configure logging for the application with rotation support.
 
     Args:
         level: Logging level (default: settings.LOG_LEVEL)
@@ -31,7 +32,7 @@ def configure_logging(
     # Clear existing handlers
     logger.handlers = []
 
-    # Create formatters and handlers
+    # Create formatter
     formatter = logging.Formatter(format_str)
 
     # Console handler
@@ -40,12 +41,26 @@ def configure_logging(
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # File handler (if specified)
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    # File handler with rotation (if specified)
+    actual_log_file = log_file or settings.LOG_FILE
+    if actual_log_file:
+        try:
+            # Use RotatingFileHandler for automatic rotation
+            file_handler = RotatingFileHandler(
+                actual_log_file,
+                maxBytes=settings.LOG_MAX_BYTES,  # Default: 10MB
+                backupCount=settings.LOG_BACKUP_COUNT,  # Default: keep 5 files
+            )
+            file_handler.setLevel(level)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            logger.info(
+                f"Logging to file: {actual_log_file} "
+                f"(max {settings.LOG_MAX_BYTES} bytes, "
+                f"backup count: {settings.LOG_BACKUP_COUNT})"
+            )
+        except Exception as e:
+            logger.warning(f"Could not setup file logging: {e}")
 
     # Reduce noise from python-telegram-bot
     logging.getLogger("telegram").setLevel(logging.WARNING)
