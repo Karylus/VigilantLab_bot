@@ -1,41 +1,5 @@
 version: 2
 updates:
-<<<<<<< HEAD
-    - package-ecosystem: "pip"
-      directory: "/"
-      schedule:
-          interval: "weekly"
-          day: "monday"
-          time: "09:00"
-          timezone: "UTC"
-      open-pull-requests-limit: 5
-      pull-request-branch-name:
-          separator: "/"
-      reviewers:
-          - "Karylus"
-      labels:
-          - "dependencies"
-          - "python"
-      commit-message:
-          prefix: "chore"
-          include: "scope"
-
-    - package-ecosystem: "github-actions"
-      directory: "/"
-      schedule:
-          interval: "weekly"
-          day: "wednesday"
-          time: "09:00"
-          timezone: "UTC"
-      reviewers:
-          - "Karylus"
-      labels:
-          - "dependencies"
-          - "ci-cd"
-      commit-message:
-          prefix: "ci"
-          include: "scope"
-=======
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
